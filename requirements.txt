@@ -1,0 +1,5 @@
+scipy
+matplotlib
+pygame
+numpy
+pywin32
