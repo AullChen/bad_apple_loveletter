@@ -1,4 +1,3 @@
-# commandline_gui_helpers.py
 import ctypes
 from ctypes.wintypes import BOOL, DWORD
 

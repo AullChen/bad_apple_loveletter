@@ -1,4 +1,9 @@
-# main.py
+"""
+    Bad Apple!! Visualizer
+    This script implements a visual representation of the "Bad Apple!!" music video using multiple windows.
+    It synchronizes the visual frames with the audio playback and adjusts the window positions and sizes accordingly.
+"""
+
 import win32con
 import win32gui
 import win32api
@@ -10,23 +15,21 @@ import threading
 import commandline_gui_helpers
 import letter
 
-
-
-# 窗口配置
+# Window configuration
 WND_CLASS = "BadApple"
 MAX_WINDOWS = 155
 BASE_WIDTH = 64
 BASE_HEIGHT = 48
-FUDGE_X = 15  # 窗口尺寸修正值
+FUDGE_X = 15
 FUDGE_Y = 8
 
-# 播放设置
-PLAYBACK_SPEED = 47.0  # 1.0 = 正常速度，0.5 = 半速，2.0 = 双倍速
-SYNC_TOLERANCE = 0.01  # 音视频同步容差（秒）
+# Playback settings
+PLAYBACK_SPEED = 47.0
+SYNC_TOLERANCE = 0.01
 
 
 class WinCoords:
-    """窗口坐标和尺寸容器"""
+    """Container for window coordinates and dimensions"""
     __slots__ = ('x', 'y', 'w', 'h')
 
     def __init__(self, x, y, w, h):
@@ -37,7 +40,7 @@ class WinCoords:
 
 
 class DeferredWindow:
-    """延迟更新的窗口对象"""
+    """Window object with deferred updates"""
 
     def __init__(self, hwnd, x=10, y=10, w=200, h=100):
         self.hwnd = hwnd
@@ -48,7 +51,7 @@ class DeferredWindow:
         self.visible = True
 
     def set_pos(self, x, y):
-        """设置窗口位置"""
+        """Set window position"""
         if self.x != x or self.y != y:
             self.x, self.y = x, y
             win32gui.SetWindowPos(
@@ -57,7 +60,7 @@ class DeferredWindow:
             )
 
     def set_size(self, w, h):
-        """设置窗口尺寸"""
+        """Set window size"""
         if self.w != w or self.h != h:
             self.w, self.h = w, h
             win32gui.SetWindowPos(
@@ -66,7 +69,7 @@ class DeferredWindow:
             )
 
     def set_visible(self, visible):
-        """设置可见性"""
+        """Set visibility"""
         if self.visible != visible:
             self.visible = visible
             cmd = win32con.SW_SHOW if visible else win32con.SW_HIDE
@@ -74,14 +77,14 @@ class DeferredWindow:
 
 
 def wnd_proc(hwnd, msg, wparam, lparam):
-    """窗口消息处理"""
+    """Window message handler"""
     if msg == win32con.WM_CLOSE:
         print("WM_CLOSE received")
     return win32gui.DefWindowProc(hwnd, msg, wparam, lparam)
 
 
 def register_window_class():
-    """注册窗口类"""
+    """Register window class"""
     wc = win32gui.WNDCLASS()
     wc.hInstance = win32api.GetModuleHandle(None)
     wc.lpszClassName = WND_CLASS
@@ -91,7 +94,7 @@ def register_window_class():
 
 
 def load_frames():
-    """加载帧数据"""
+    """Load frame data"""
     path = os.path.join("../assets", "boxes.bin")
     if not os.path.exists(path):
         raise FileNotFoundError(f"Required data file {path} missing!")
@@ -112,20 +115,20 @@ def load_frames():
 
 
 def bad_apple():
-    # 初始化控制台
+    # Initialize console
     commandline_gui_helpers.init()
 
-    # 注册窗口类
+    # Register window class
     register_window_class()
 
     try:
-        # 加载帧数据
+        # Load frame data
         frames = load_frames()
     except Exception as e:
         print(f"Error loading frames: {e}")
         return
 
-    # 创建窗口
+    # Create windows
     windows = []
     for _ in range(MAX_WINDOWS):
         hwnd = win32gui.CreateWindowEx(
@@ -138,39 +141,36 @@ def bad_apple():
         )
         windows.append(DeferredWindow(hwnd))
 
-    # 计算屏幕适配比例
+    # Calculate screen adaptation ratio
     screen_width = win32api.GetSystemMetrics(win32con.SM_CXVIRTUALSCREEN)
     screen_height = win32api.GetSystemMetrics(win32con.SM_CYVIRTUALSCREEN)
     ratio_x = screen_width / BASE_WIDTH
     ratio_y = screen_height / BASE_HEIGHT
 
-    # 初始化音频
+    # Initialize audio
     pygame.mixer.init()
     pygame.mixer.music.load(os.path.join("../assets", "bad apple.ogg"))
     start_time = time.time()
     pygame.mixer.music.play()
     time.sleep(3)
 
-    # 主循环
+    # Main loop
     frame_index = 0
     audio_start = time.time()
     last_frame_time = audio_start
     try:
         while frame_index < len(frames):
-            # 处理Windows消息
+            # Handle Windows messages
             win32gui.PumpWaitingMessages()
 
-            # 计算经过的音频时间
             audio_elapsed = time.time() - audio_start
-            
-            # 计算目标视频帧（根据速度调整）
             target_frame = int(audio_elapsed * 30 * PLAYBACK_SPEED)
             
-            # 同步检查
+            # Sync check
             if abs(frame_index - target_frame) > MAX_WINDOWS * SYNC_TOLERANCE:
-                frame_index = target_frame  # 强制同步
+                frame_index = target_frame
 
-            # 更新窗口状态
+            # Update window states
             for i in range(MAX_WINDOWS):
                 idx = frame_index + i
                 if idx >= len(frames):
@@ -181,7 +181,7 @@ def bad_apple():
                     windows[i].set_visible(False)
                     continue
 
-                # 计算实际位置和尺寸
+                # Calculate actual position and size
                 x = int(coords.x * ratio_x)
                 y = int(coords.y * ratio_y)
                 w = int(coords.w * ratio_x) + FUDGE_X
@@ -191,7 +191,7 @@ def bad_apple():
                 windows[i].set_size(w, h)
                 windows[i].set_visible(True)
 
-            # 精确帧率控制
+            # Precise frame rate control
             now = time.time()
             frame_duration = (1 / 30) / PLAYBACK_SPEED
             sleep_time = max(0, frame_duration - (now - last_frame_time))
@@ -199,21 +199,22 @@ def bad_apple():
             last_frame_time = now
 
             frame_index += MAX_WINDOWS
-            time.sleep(1/30 - 0.005)  # 补偿处理时间
+            time.sleep(1/30 - 0.005)
 
     finally:
-        # 清理资源
+        # Clean up resources
         pygame.mixer.quit()
         for window in windows:
             win32gui.DestroyWindow(window.hwnd)
 
 
 def main():
+    """Show letter first then play bad apple"""
     letter_thread = threading.Thread(target=letter.start)
     letter_thread.start()
     time.sleep(37)
     bad_apple()
-    letter_thread.join()  # 等待 letter.start() 完成
+    letter_thread.join()
     
 
 
